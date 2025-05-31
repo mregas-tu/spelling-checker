@@ -4,11 +4,11 @@
   "login_password_forgot_password_text": "Olvid\u00e9 mi contrase\u00f1a",
   "login_document_input_label": "Documento de identidad",
   "login_password_input_text_default": "Ingresa tu contrase\u00f1a",
-  "login_next_button": "asdasd",
+  "login_next_button": "123123",
   "login_password_placeholder": "Contrase\u00f1a",
   "login_password_label": "Contrase\u00f1as",
   "login_document_pepito": "El documento ingresado no es v\u00e1lidos",
   "login_document_hint": "HOLA",
   "login_document_hint_error": "El documento ingresado no es v\u00e1lido",
-  "login_document_title": "Ingresar documento 222\n"
+  "login_document_title": "Ingresar documento\n"
 }
