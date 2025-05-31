@@ -23,7 +23,15 @@
     <script>
       const API_BASE = "https://spelling-checker-proxy.martin-regas.workers.dev";
 
+      async function compareOnly() {
+        await sync(false);
+      }
+
       async function startSync() {
+        await sync(true);
+      }
+
+      async function sync(doUpdate) {
         const log = (msg) => {
           document.getElementById("log").textContent += "\n" + msg;
         };
@@ -78,7 +86,7 @@
             document.getElementById("deleted").innerHTML = "<h3>🟥 Eliminados:</h3>" + deleted.map(k => `<div class='red'>${k}</div>`).join("");
           }
 
-          if (confirm("¿Querés actualizar el archivo en el repo?")) {
+          if (doUpdate && confirm("¿Querés actualizar el archivo en el repo?")) {
             const result = await fetch(`${API_BASE}/github`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
