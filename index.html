@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sync de textos desde Figma</title>
+    <style>
+      body { font-family: sans-serif; padding: 2rem; background: #f4f4f4; }
+      pre { background: #fff; padding: 1rem; border-radius: 8px; max-height: 50vh; overflow: auto; }
+      button { padding: 0.5rem 1rem; margin: 1rem 0; font-size: 1rem; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h2>🔄 Sincronizar textos desde Figma</h2>
+    <button onclick="startSync()">🚀 Sincronizar</button>
+    <pre id="log">Esperando acción...</pre>
+
+    <script>
+      const API_BASE = "https://spelling-checker-proxy.martin-regas.workers.dev";
+
+      async function startSync() {
+        const log = (msg) => {
+          document.getElementById("log").textContent += "\n" + msg;
+        };
+        document.getElementById("log").textContent = "🟡 Iniciando sincronización...";
+
+        try {
+          log("📥 Obteniendo textos de Figma...");
+          const figma = await fetch(`${API_BASE}/figma`).then(r => r.json());
+
+          log("📤 Obteniendo textos del repo...");
+          const repo = await fetch(`${API_BASE}/github`).then(r => r.json());
+
+          const updated = {};
+          for (const key in figma) {
+            if (!repo[key] || repo[key] !== figma[key]) {
+              updated[key] = figma[key];
+            }
+          }
+
+          const deleted = Object.keys(repo).filter(k => !(k in figma));
+
+          if (Object.keys(updated).length === 0 && deleted.length === 0) {
+            log("✅ Todo está sincronizado.");
+            return;
+          }
+
+          log("📝 Cambios detectados:");
+          if (Object.keys(updated).length)
+            log("🔧 Modificados o nuevos:\n" + JSON.stringify(updated, null, 2));
+          if (deleted.length)
+            log("❌ Eliminados:\n" + JSON.stringify(deleted, null, 2));
+
+          if (confirm("¿Querés actualizar el archivo en el repo?")) {
+            const result = await fetch(`${API_BASE}/github`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ updated, deleted })
+            }).then(r => r.json());
+
+            log("📦 Resultado del update:\n" + JSON.stringify(result, null, 2));
+          } else {
+            log("❌ Cancelado por el usuario.");
+          }
+        } catch (e) {
+          log("❌ Error:\n" + e.message);
+        }
+      }
+    </script>
+  </body>
+</html>
