@@ -7,6 +7,6 @@
   "login_password_input_text_default": "Ingresa tu contraseña",
   "login_next_button": "Continuar 2",
   "login_password_label": "Contraseña",
-  "login_document_title": "Ingresar documento",
-  "login_document_input_text_default": "Ingresa"
+  "login_document_hint": "El documento ingresado no es válido",
+  "login_document_title": "Ingresar documento"
 }
