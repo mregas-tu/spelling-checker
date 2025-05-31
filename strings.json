@@ -1,12 +1,3 @@
 {
-  "login_title": "Iniciar sesión",
-  "login_exitbutton": "Salir",
-  "login_document_hint_error": "El documento ingresado no es válido",
-  "login_password_forgot_password_text": "Olvidé mi contraseña",
-  "login_document_input_label": "Documento de identidad",
-  "login_password_input_text_default": "Ingresa tu contraseña",
-  "login_next_button": "Continuar 2",
-  "login_password_label": "Contraseñas",
-  "login_document_hint": "El documento ingresado no es válido",
-  "login_document_title": "Ingresar documento"
+  "test_key": "hola marto"
 }
