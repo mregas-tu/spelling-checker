@@ -43,12 +43,12 @@
       const tabla = document.getElementById("tabla-body");
       tabla.innerHTML = "";
 
-      // Mostrar valores que están en Figma
       for (const [key, figmaValues] of Object.entries(strings)) {
         const figmaText = figmaValues.join(", ");
         const repoText = repoData[key] ?? "";
 
-        let estado = "Sin cambios";
+        let estado = null;
+
         if (!repoData.hasOwnProperty(key)) {
           estado = "Nuevo";
         } else if (repoText !== figmaText) {
@@ -59,10 +59,11 @@
           estado = "Conflicto";
         }
 
-        renderRow(tabla, key, figmaText, repoText, estado);
+        if (estado) {
+          renderRow(tabla, key, figmaText, repoText, estado);
+        }
       }
 
-      // Mostrar valores que están en el repo pero no en Figma
       for (const key of Object.keys(repoData)) {
         if (!strings.hasOwnProperty(key)) {
           renderRow(tabla, key, "", repoData[key], "Eliminado");
@@ -83,7 +84,6 @@
         <td>${repo}</td>
         <td>${estado}</td>
       `;
-
       tbody.appendChild(tr);
     }
   </script>
