@@ -5,19 +5,30 @@
     <title>Sync de textos desde Figma</title>
     <style>
       body { font-family: sans-serif; padding: 2rem; background: #f4f4f4; }
-      pre { background: #fff; padding: 1rem; border-radius: 8px; max-height: 50vh; overflow: auto; }
+      table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+      th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+      th { background: #222; color: #fff; }
+      .green { background: #d4edda; }
+      .red { background: #f8d7da; }
+      .yellow { background: #fff3cd; }
       button { padding: 0.5rem 1rem; margin: 1rem 0; font-size: 1rem; cursor: pointer; }
-      .green { background: #d4edda; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; }
-      .red { background: #f8d7da; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; }
-      .yellow { background: #fff3cd; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; }
+      pre { background: #fff; padding: 1rem; border-radius: 8px; }
     </style>
   </head>
   <body>
     <h2>🔄 Sincronizar textos desde Figma</h2>
     <button onclick="startSync()">🚀 Sincronizar</button>
-    <div id="warnings"></div>
-    <div id="changes"></div>
-    <div id="deleted"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>🧠 Nodo</th>
+          <th>🎨 Valor Figma</th>
+          <th>📦 Valor Repo</th>
+          <th>📌 Estado</th>
+        </tr>
+      </thead>
+      <tbody id="diffTable"></tbody>
+    </table>
     <pre id="log">Esperando acción...</pre>
 
     <script>
@@ -36,9 +47,8 @@
           document.getElementById("log").textContent += "\n" + msg;
         };
         document.getElementById("log").textContent = "🟡 Iniciando sincronización...";
-        document.getElementById("warnings").innerHTML = "";
-        document.getElementById("changes").innerHTML = "";
-        document.getElementById("deleted").innerHTML = "";
+        const table = document.getElementById("diffTable");
+        table.innerHTML = "";
 
         try {
           log("📥 Obteniendo textos de Figma...");
@@ -48,43 +58,46 @@
           const repo = await fetch(`${API_BASE}/github`).then(r => r.json());
 
           const updated = {};
-          const warnings = [];
           const deleted = [];
+          const figmaSeen = {};
+          const outputRows = [];
 
           const figmaKeys = Object.keys(figma);
           const repoKeys = Object.keys(repo);
 
           for (const key of figmaKeys) {
-            if (repo[key] && repo[key] !== figma[key]) {
-              updated[key] = figma[key];
-              if (figmaKeys.filter(k => k === key).length > 1) {
-                warnings.push(key);
-              }
+            figmaSeen[key] = (figmaSeen[key] || 0) + 1;
+          }
+
+          for (const key of figmaKeys) {
+            const valueFigma = figma[key];
+            const valueRepo = repo[key];
+            const duplicate = figmaSeen[key] > 1;
+
+            if (duplicate && valueRepo && valueFigma !== valueRepo) {
+              outputRows.push(makeRow(key, valueFigma, valueRepo, "Conflicto", "yellow"));
+            } else if (valueRepo === undefined) {
+              outputRows.push(makeRow(key, valueFigma, "", "Nuevo", "green"));
+              updated[key] = valueFigma;
+            } else if (valueFigma !== valueRepo) {
+              outputRows.push(makeRow(key, valueFigma, valueRepo, "Cambio", "green"));
+              updated[key] = valueFigma;
             }
           }
 
           for (const key of repoKeys) {
             if (!(key in figma)) {
+              outputRows.push(makeRow(key, "", repo[key], "Eliminado", "red"));
               deleted.push(key);
             }
           }
 
-          if (Object.keys(updated).length === 0 && deleted.length === 0 && warnings.length === 0) {
+          if (outputRows.length === 0) {
             log("✅ Todo está sincronizado.");
             return;
           }
 
-          if (warnings.length) {
-            document.getElementById("warnings").innerHTML = "<h3>🟨 Warnings (duplicados):</h3>" + warnings.map(k => `<div class='yellow'>${k}</div>`).join("");
-          }
-
-          if (Object.keys(updated).length) {
-            document.getElementById("changes").innerHTML = "<h3>✅ Cambios detectados:</h3>" + Object.entries(updated).map(([k,v]) => `<div class='green'><strong>${k}</strong>: ${v}</div>`).join("");
-          }
-
-          if (deleted.length) {
-            document.getElementById("deleted").innerHTML = "<h3>🟥 Eliminados:</h3>" + deleted.map(k => `<div class='red'>${k}</div>`).join("");
-          }
+          outputRows.forEach(row => table.appendChild(row));
 
           if (doUpdate && confirm("¿Querés actualizar el archivo en el repo?")) {
             const result = await fetch(`${API_BASE}/github`, {
@@ -102,7 +115,15 @@
           log("❌ Error:\n" + e.message);
         }
       }
-    window.onload = compareOnly;
-</script>
+
+      function makeRow(key, figmaVal, repoVal, estado, clase) {
+        const tr = document.createElement("tr");
+        tr.className = clase;
+        tr.innerHTML = `<td>${key}</td><td>${figmaVal}</td><td>${repoVal}</td><td>${estado}</td>`;
+        return tr;
+      }
+
+      window.onload = compareOnly;
+    </script>
   </body>
 </html>
