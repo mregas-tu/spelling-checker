@@ -27,7 +27,7 @@
         <th>📌 Estado</th>
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="tabla-body"></tbody>
   </table>
 
   <script>
@@ -35,35 +35,42 @@
       const figmaRes = await fetch("https://spelling-checker-proxy.martin-regas.workers.dev/figma");
       const repoRes = await fetch("https://spelling-checker-proxy.martin-regas.workers.dev/github");
 
-      const figmaData = await figmaRes.json(); // { strings, conflicts }
+      const figmaJson = await figmaRes.json(); // { strings, conflicts }
       const repoData = await repoRes.json();
 
-      const strings = figmaData.strings;
-      const conflicts = new Set(figmaData.conflicts);
-
-      const tabla = document.querySelector("tbody");
+      const strings = figmaJson.strings;
+      const conflicts = new Set(figmaJson.conflicts);
+      const tabla = document.getElementById("tabla-body");
       tabla.innerHTML = "";
 
+      // Mostrar valores que están en Figma
       for (const [key, figmaValues] of Object.entries(strings)) {
         const figmaText = figmaValues.join(", ");
         const repoText = repoData[key] ?? "";
 
         let estado = "Sin cambios";
-        if (!repoData.hasOwnProperty(key)) estado = "Nuevo";
-        else if (repoText !== figmaText) estado = "Cambio";
-        if (conflicts.has(key)) estado = "Conflicto";
+        if (!repoData.hasOwnProperty(key)) {
+          estado = "Nuevo";
+        } else if (repoText !== figmaText) {
+          estado = "Cambio";
+        }
 
-        renderRow(key, figmaText, repoText, estado);
+        if (conflicts.has(key)) {
+          estado = "Conflicto";
+        }
+
+        renderRow(tabla, key, figmaText, repoText, estado);
       }
 
+      // Mostrar valores que están en el repo pero no en Figma
       for (const key of Object.keys(repoData)) {
         if (!strings.hasOwnProperty(key)) {
-          renderRow(key, "", repoData[key], "Eliminado");
+          renderRow(tabla, key, "", repoData[key], "Eliminado");
         }
       }
     }
 
-    function renderRow(nodo, figma, repo, estado) {
+    function renderRow(tbody, nodo, figma, repo, estado) {
       const tr = document.createElement("tr");
       tr.className = estado === "Conflicto" ? "yellow" :
                      estado === "Nuevo"     ? "green" :
@@ -76,7 +83,8 @@
         <td>${repo}</td>
         <td>${estado}</td>
       `;
-      document.querySelector("tbody").appendChild(tr);
+
+      tbody.appendChild(tr);
     }
   </script>
 </body>
