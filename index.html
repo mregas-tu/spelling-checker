@@ -52,25 +52,7 @@
 
         try {
           log("📥 Obteniendo textos de Figma...");
-          
-    const rawFigma = await fetch(`${API_BASE}/figma`).then(r => r.json());
-    const figma = {};
-    const figmaVariants = {};
-
-    for (const [k, v] of Object.entries(rawFigma)) {
-      if (!figmaVariants[k]) figmaVariants[k] = new Set();
-      figmaVariants[k].add(v);
-    }
-
-    for (const k of Object.keys(figmaVariants)) {
-      const variants = Array.from(figmaVariants[k]);
-      if (variants.length > 1) {
-        figma[k] = "⚠ Múltiples valores en Figma";
-      } else {
-        figma[k] = variants[0];
-      }
-    }
-    
+          const figma = await fetch(`${API_BASE}/figma`).then(r => r.json());
 
           log("📤 Obteniendo textos del repo...");
           const repo = await fetch(`${API_BASE}/github`).then(r => r.json());
@@ -92,7 +74,7 @@
             const valueRepo = repo[key];
             const duplicate = figmaSeen[key] > 1;
 
-            if (duplicate && valueRepo && valueFigma !== valueRepo) {
+            if (conflictKeys.includes(key)) {
               outputRows.push(makeRow(key, valueFigma, valueRepo, "Conflicto", "yellow"));
             } else if (valueRepo === undefined) {
               outputRows.push(makeRow(key, valueFigma, "", "Nuevo", "green"));
