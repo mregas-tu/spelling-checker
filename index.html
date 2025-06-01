@@ -17,7 +17,6 @@
 <body>
   <h2>🔄 Sincronizar textos desde Figma</h2>
   <button onclick="subirCambios()">🚀 Sincronizar</button>
-  <p id="sha-info"></p>
 
   <table>
     <thead>
@@ -40,10 +39,10 @@
     window.onload = cargarDatos;
 
     async function cargarDatos() {
-      const figmaRes = await fetch(`${API_URL}/figma`, { cache: "no-store" });
-      const repoRes = await fetch(`${API_URL}/github`, { cache: "no-store" });
+      const figmaRes = await fetch(`${API_URL}/figma`);
+      const repoRes = await fetch(`${API_URL}/github`);
       const figmaJson = await figmaRes.json();
-      repoData = repoRes.ok ? await repoRes.json() : {};
+      repoData = await repoRes.json();
       strings = figmaJson.strings;
       conflicts = new Set(figmaJson.conflicts);
 
@@ -51,25 +50,21 @@
       tabla.innerHTML = "";
 
       for (const [key, figmaValues] of Object.entries(strings)) {
-        const figmaText = figmaValues.join(", ");
-        const repoText = repoData.data?.[key] ?? "";
+        const figmaText = [...new Set(figmaValues)].sort().join(", ");
+        const repoText = repoData[key] ?? "";
         let estado = null;
 
-        if (!repoData.data?.hasOwnProperty(key)) estado = "Nuevo";
+        if (!repoData.hasOwnProperty(key)) estado = "Nuevo";
         else if (repoText !== figmaText) estado = "Cambio";
         if (conflicts.has(key)) estado = "Conflicto";
 
         if (estado) renderRow(tabla, key, figmaText, repoText, estado);
       }
 
-      for (const key of Object.keys(repoData.data || {})) {
+      for (const key of Object.keys(repoData)) {
         if (!strings.hasOwnProperty(key)) {
-          renderRow(tabla, key, "", repoData.data[key], "Eliminado");
+          renderRow(tabla, key, "", repoData[key], "Eliminado");
         }
-      }
-
-      if (repoData.sha) {
-        document.getElementById("sha-info").innerText = `Último SHA: ${repoData.sha}`;
       }
     }
 
@@ -94,17 +89,17 @@
       const deleted = [];
 
       for (const [key, values] of Object.entries(strings)) {
-        const nuevoValor = values.join(", ");
-        const valorViejo = repoData.data?.[key];
+        const nuevoValor = [...new Set(values)].sort().join(", ");
+        const valorViejo = repoData[key];
 
-        if (!repoData.data?.hasOwnProperty(key)) {
+        if (!repoData.hasOwnProperty(key)) {
           updated[key] = nuevoValor;
         } else if (valorViejo !== nuevoValor) {
           updated[key] = nuevoValor;
         }
       }
 
-      for (const key of Object.keys(repoData.data || {})) {
+      for (const key of Object.keys(repoData)) {
         if (!strings.hasOwnProperty(key)) {
           deleted.push(key);
         }
@@ -120,7 +115,7 @@
 
       if (res.ok) {
         alert("✅ Cambios subidos correctamente al backend.");
-        cargarDatos();
+        cargarDatos(); // recarga la tabla
       } else {
         const msg = await res.text();
         alert("❌ Error al subir los cambios:\n" + msg);
