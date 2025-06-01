@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Sync de textos desde Figma</title>
+  <title>Sincronizador de textos</title>
   <style>
     body { font-family: sans-serif; padding: 2rem; background: #f4f4f4; }
     table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
@@ -13,12 +12,12 @@
     .red { background: #f8d7da; }
     .yellow { background: #fff3cd; }
     button { padding: 0.5rem 1rem; margin: 1rem 0; font-size: 1rem; cursor: pointer; }
-    pre { background: #fff; padding: 1rem; border-radius: 8px; }
   </style>
 </head>
 <body>
   <h2>🔄 Sincronizar textos desde Figma</h2>
-  <button onclick="startSync()">🚀 Sincronizar</button>
+  <button onclick="sincronizar()">🚀 Sincronizar</button>
+
   <table>
     <thead>
       <tr>
@@ -28,110 +27,57 @@
         <th>📌 Estado</th>
       </tr>
     </thead>
-    <tbody id="diffTable"></tbody>
+    <tbody></tbody>
   </table>
-  <pre id="log">Esperando acción...</pre>
 
   <script>
-    const API_BASE = "https://spelling-checker-proxy.martin-regas.workers.dev";
+    async function sincronizar() {
+      const figmaRes = await fetch("https://spelling-checker-proxy.martin-regas.workers.dev/figma");
+      const repoRes = await fetch("https://spelling-checker-proxy.martin-regas.workers.dev/github");
 
-    async function compareOnly() {
-      await sync(false);
-    }
+      const figmaData = await figmaRes.json(); // { strings, conflicts }
+      const repoData = await repoRes.json();
 
-    async function startSync() {
-      await sync(true);
-    }
+      const strings = figmaData.strings;
+      const conflicts = new Set(figmaData.conflicts);
 
-    async function sync(doUpdate) {
-      const log = (msg) => {
-        document.getElementById("log").textContent += "\n" + msg;
-      };
-      document.getElementById("log").textContent = "🟡 Iniciando sincronización...";
-      const table = document.getElementById("diffTable");
-      table.innerHTML = "";
+      const tabla = document.querySelector("tbody");
+      tabla.innerHTML = "";
 
-      try {
-        log("📥 Obteniendo textos de Figma...");
-        const rawFigma = await fetch(`${API_BASE}/figma`).then(r => r.json());
+      for (const [key, figmaValues] of Object.entries(strings)) {
+        const figmaText = figmaValues.join(", ");
+        const repoText = repoData[key] ?? "";
 
-        log("📤 Obteniendo textos del repo...");
-        const repo = await fetch(`${API_BASE}/github`).then(r => r.json());
+        let estado = "Sin cambios";
+        if (!repoData.hasOwnProperty(key)) estado = "Nuevo";
+        else if (repoText !== figmaText) estado = "Cambio";
+        if (conflicts.has(key)) estado = "Conflicto";
 
-        const updated = {};
-        const deleted = [];
-        const figma = {};
-        const figmaVariants = {};
+        renderRow(key, figmaText, repoText, estado);
+      }
 
-        for (const [k, v] of Object.entries(rawFigma)) {
-          if (!figmaVariants[k]) figmaVariants[k] = new Set();
-          figmaVariants[k].add(v);
+      for (const key of Object.keys(repoData)) {
+        if (!strings.hasOwnProperty(key)) {
+          renderRow(key, "", repoData[key], "Eliminado");
         }
-
-        const conflictKeys = Object.keys(figmaVariants).filter(k => figmaVariants[k].size > 1);
-
-        for (const k of Object.keys(figmaVariants)) {
-          figma[k] = [...figmaVariants[k]].join(" | ");
-        }
-
-        const figmaKeys = Object.keys(figma);
-        const repoKeys = Object.keys(repo);
-        const outputRows = [];
-
-        for (const key of figmaKeys) {
-          const valueFigma = figma[key];
-          const valueRepo = repo[key];
-
-          if (valueRepo === undefined) {
-            outputRows.push(makeRow(key, valueFigma, "", "Nuevo", "green"));
-            updated[key] = valueFigma;
-          } else if (valueFigma !== valueRepo) {
-            const state = conflictKeys.includes(key) ? "Conflicto" : "Cambio";
-            const color = conflictKeys.includes(key) ? "yellow" : "green";
-            outputRows.push(makeRow(key, valueFigma, valueRepo, state, color));
-            updated[key] = valueFigma;
-          }
-        }
-
-        for (const key of repoKeys) {
-          if (!(key in figma)) {
-            outputRows.push(makeRow(key, "", repo[key], "Eliminado", "red"));
-            deleted.push(key);
-          }
-        }
-
-        if (outputRows.length === 0) {
-          log("✅ Todo está sincronizado.");
-          return;
-        }
-
-        outputRows.forEach(row => table.appendChild(row));
-
-        if (doUpdate && confirm("¿Querés actualizar el archivo en el repo?")) {
-          const result = await fetch(`${API_BASE}/github`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ updated, deleted })
-          }).then(r => r.json());
-
-          log("📦 Resultado del update:\n" + JSON.stringify(result, null, 2));
-        } else {
-          log("❌ Cancelado por el usuario.");
-        }
-
-      } catch (e) {
-        log("❌ Error:\n" + e.message);
       }
     }
 
-    function makeRow(key, figmaVal, repoVal, estado, clase) {
+    function renderRow(nodo, figma, repo, estado) {
       const tr = document.createElement("tr");
-      tr.className = clase;
-      tr.innerHTML = `<td>${key}</td><td>${figmaVal}</td><td>${repoVal}</td><td>${estado}</td>`;
-      return tr;
-    }
+      tr.className = estado === "Conflicto" ? "yellow" :
+                     estado === "Nuevo"     ? "green" :
+                     estado === "Eliminado" ? "red"   :
+                     estado === "Cambio"    ? "green" : "";
 
-    window.onload = compareOnly;
+      tr.innerHTML = `
+        <td>${nodo}</td>
+        <td>${figma}</td>
+        <td>${repo}</td>
+        <td>${estado}</td>
+      `;
+      document.querySelector("tbody").appendChild(tr);
+    }
   </script>
 </body>
 </html>
