@@ -1,14 +1,13 @@
 {
-  "login_title": "Iniciar sesión",
-  "login_exitbutton": "Saliró",
-  "login_password_forgot_password_text": "\"Probando acentos: áéíóú ñ ¿¡\"",
-  "login_document_input_label": "Documento de idenítidad",
-  "login_password_input_text_default": "asdasd",
+  "login_title": "Iniciar sesiÃ³n",
+  "login_exitbutton": "SalirÃ³",
+  "login_password_forgot_password_text": "\"Probando acentos: Ã¡Ã©Ã­Ã³Ãº Ã± Â¿Â¡\"",
+  "login_document_input_label": "Documento de idenítóidad",
   "login_password_placeholder": "asdasd",
-  "login_password_label": "Contraseñasa",
-  "login_document_pepito": "El documento ingresado no es válidos",
+  "login_password_label": "ContraseÃ±asa",
+  "login_document_pepito": "El documento ingresado no es vÃ¡lidos",
   "login_document_nuevo": "HOLA",
   "login_document_hint": "HOLA",
-  "login_document_hint_error": "El documento ingresado no es válido 3, El documento ingresado no es válido, El documento ingresado no es válido 2",
+  "login_document_hint_error": "El documento ingresado no es vÃ¡lido 3, El documento ingresado no es vÃ¡lido, El documento ingresado no es vÃ¡lido 2",
   "login_document_title": "Ingresar documento"
 }
