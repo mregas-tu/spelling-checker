@@ -16,7 +16,7 @@
 </head>
 <body>
   <h2>🔄 Sincronizar textos desde Figma</h2>
-  <button onclick="sincronizar()">🚀 Sincronizar</button>
+  <button onclick="subirCambios()">🚀 Sincronizar</button>
 
   <table>
     <thead>
@@ -31,37 +31,34 @@
   </table>
 
   <script>
-    async function sincronizar() {
-      const figmaRes = await fetch("https://spelling-checker-proxy.martin-regas.workers.dev/figma");
-      const repoRes = await fetch("https://spelling-checker-proxy.martin-regas.workers.dev/github");
+    let strings = {};
+    let conflicts = new Set();
+    let repoData = {};
+    const API_URL = "https://spelling-checker-proxy.martin-regas.workers.dev";
 
-      const figmaJson = await figmaRes.json(); // { strings, conflicts }
-      const repoData = await repoRes.json();
+    window.onload = cargarDatos;
 
-      const strings = figmaJson.strings;
-      const conflicts = new Set(figmaJson.conflicts);
+    async function cargarDatos() {
+      const figmaRes = await fetch(`${API_URL}/figma`);
+      const repoRes = await fetch(`${API_URL}/github`);
+      const figmaJson = await figmaRes.json();
+      repoData = await repoRes.json();
+      strings = figmaJson.strings;
+      conflicts = new Set(figmaJson.conflicts);
+
       const tabla = document.getElementById("tabla-body");
       tabla.innerHTML = "";
 
       for (const [key, figmaValues] of Object.entries(strings)) {
         const figmaText = figmaValues.join(", ");
         const repoText = repoData[key] ?? "";
-
         let estado = null;
 
-        if (!repoData.hasOwnProperty(key)) {
-          estado = "Nuevo";
-        } else if (repoText !== figmaText) {
-          estado = "Cambio";
-        }
+        if (!repoData.hasOwnProperty(key)) estado = "Nuevo";
+        else if (repoText !== figmaText) estado = "Cambio";
+        if (conflicts.has(key)) estado = "Conflicto";
 
-        if (conflicts.has(key)) {
-          estado = "Conflicto";
-        }
-
-        if (estado) {
-          renderRow(tabla, key, figmaText, repoText, estado);
-        }
+        if (estado) renderRow(tabla, key, figmaText, repoText, estado);
       }
 
       for (const key of Object.keys(repoData)) {
@@ -85,6 +82,44 @@
         <td>${estado}</td>
       `;
       tbody.appendChild(tr);
+    }
+
+    async function subirCambios() {
+      const updated = {};
+      const deleted = [];
+
+      for (const [key, values] of Object.entries(strings)) {
+        const nuevoValor = values.join(", ");
+        const valorViejo = repoData[key];
+
+        if (!repoData.hasOwnProperty(key)) {
+          updated[key] = nuevoValor;
+        } else if (valorViejo !== nuevoValor) {
+          updated[key] = nuevoValor;
+        }
+      }
+
+      for (const key of Object.keys(repoData)) {
+        if (!strings.hasOwnProperty(key)) {
+          deleted.push(key);
+        }
+      }
+
+      const body = JSON.stringify({ updated, deleted });
+
+      const res = await fetch(`${API_URL}/github`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body
+      });
+
+      if (res.ok) {
+        alert("✅ Cambios subidos correctamente al backend.");
+        cargarDatos(); // recarga la tabla
+      } else {
+        const msg = await res.text();
+        alert("❌ Error al subir los cambios:\n" + msg);
+      }
     }
   </script>
 </body>
