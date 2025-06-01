@@ -1,14 +1,14 @@
 {
-  "login_title": "Iniciar sesión",
+  "login_title": "Iniciar sesiÃ³n",
   "login_exitbutton": "Salir",
-  "login_password_forgot_password_text": "lalalal",
+  "login_password_forgot_password_text": "asdasd",
   "login_document_input_label": "Documento de identidad",
   "login_password_input_text_default": "caca",
-  "login_next_button": "asd",
-  "login_password_placeholder": "Contraseña",
-  "login_password_label": "Contraseñasa",
-  "login_document_pepito": "El documento ingresado no es válidos",
+  "login_password_placeholder": "asdasd",
+  "login_password_label": "ContraseÃ±asa",
+  "login_document_pepito": "El documento ingresado no es vÃ¡lidos",
   "login_document_hint": "HOLA",
-  "login_document_hint_error": "El documento ingresado no es válido",
-  "login_document_title": "Ingresar documento"
+  "login_document_hint_error": "El documento ingresado no es válido 2",
+  "login_document_title": "Ingresar documento",
+  "login_document_nuevo": "HOLA"
 }
