@@ -8,6 +8,6 @@
   "login_document_pepito": "El documento ingresado no es válido",
   "login_document_nuevo": "HOLA",
   "login_document_hint": "HOLA",
-  "login_document_hint_error": "El documento ingresado no es válido 3",
+  "login_document_hint_error": "El documento ingresado no es válido.",
   "login_document_title": "Ingresar documento"
 }
