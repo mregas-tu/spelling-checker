@@ -74,13 +74,13 @@
             const valueRepo = repo[key];
             const duplicate = figmaSeen[key] > 1;
 
-            if (conflictKeys.includes(key)) {
+            if (duplicate && valueRepo && valueFigma !== valueRepo) {
               outputRows.push(makeRow(key, valueFigma, valueRepo, "Conflicto", "yellow"));
             } else if (valueRepo === undefined) {
               outputRows.push(makeRow(key, valueFigma, "", "Nuevo", "green"));
               updated[key] = valueFigma;
             } else if (valueFigma !== valueRepo) {
-              outputRows.push(makeRow(key, valueFigma, valueRepo, "Cambio", "green"));
+              outputRows.push(makeRow(key, valueFigma, valueRepo, conflictKeys.includes(key) ? "Conflicto" : "Cambio", "green"));
               updated[key] = valueFigma;
             }
           }
