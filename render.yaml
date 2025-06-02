@@ -3,5 +3,5 @@ services:
     name: figma-sync
     runtime: python
     buildCommand: ""
-    startCommand: python ui.py
+    startCommand: streamlit run ui.py --server.port=10000 --server.address=0.0.0.0
     plan: free
