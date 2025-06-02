@@ -1,14 +1,12 @@
 {
-  "login_document_input_text_default": "Ingresa",
-  "login_next_button": "Continuarás",
+  "login_document_input_text_default": "Ingresá",
+  "login_next_button": "Continuar",
   "login_document_title": "Ingresar documento",
-  "login_document_input_label_1": "Documento de identidad",
   "login_document_input_label": "Documento de identidad",
   "login_document_hint_error": "El documento ingresado no es válido",
   "login_password_label": "Contraseña",
   "login_password_input_text_default": "Ingresá tu contraseña",
   "login_password_forgot_password_text": "Olvidé mi contraseña",
   "login_exitbutton": "Salir",
-  "login_placeholder": "Iniciar sesióna",
   "login_title": "Iniciar sesión"
 }
