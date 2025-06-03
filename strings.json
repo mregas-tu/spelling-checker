@@ -1,7 +1,7 @@
 {
   "login_title": "Iniciar sesión",
   "login_document_input_text_default": "Ingresá",
-  "login_next_button": "Continuar",
+  "login_next_button": "Continuara",
   "login_document_title": "Ingresar documento",
   "login_document_input_label": "Documento de identidad",
   "login_document_hint_error": "El documento ingresado no es válido",
