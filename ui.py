@@ -147,25 +147,26 @@ if not st.session_state.ortografia:
                     st.rerun()
                 else:
                     st.info("✅ No se encontraron sugerencias ortográficas.")
-                    if st.button("Actualizar strings en GitHub y RemoteConfig"):
-                        try:
-                            with open("strings.json", "w", encoding="utf-8") as f:
-                                flat_figma_data = {k: (v[0] if isinstance(v, list) else v) for k, v in figma_data.items() if v}
-                                json.dump(flat_figma_data, f, ensure_ascii=False, indent=2)
-                            figma_to_firebase.upload_to_firebase(flat_figma_data)
-                            figma_to_firebase.upload_file_to_github(
-                                file_path="strings.json",
-                                repo="mregas-tu/spelling-checker",
-                                path_in_repo="strings.json",
-                                branch="main"
-                            )
-                            st.success("✅ Strings actualizados correctamente en GitHub y Firebase")
-                        except Exception as e:
-                            st.error(f"❌ No se pudo subir el JSON: {str(e)}")
             except Exception as e:
                 st.error(f"❌ Error al analizar ortografía: {str(e)}")
 else:
     st.markdown("#### Sugerencias detectadas")
+
+    if st.button("Actualizar strings en GitHub y RemoteConfig"):
+        try:
+            with open("strings.json", "w", encoding="utf-8") as f:
+                flat_figma_data = {k: (v[0] if isinstance(v, list) else v) for k, v in figma_data.items() if v}
+                json.dump(flat_figma_data, f, ensure_ascii=False, indent=2)
+            figma_to_firebase.upload_to_firebase(flat_figma_data)
+            figma_to_firebase.upload_file_to_github(
+                file_path="strings.json",
+                repo="mregas-tu/spelling-checker",
+                path_in_repo="strings.json",
+                branch="main"
+            )
+            st.success("✅ Strings actualizados correctamente en GitHub y Firebase")
+        except Exception as e:
+            st.error(f"❌ No se pudo subir el JSON: {str(e)}")
     for key, pair in st.session_state.sugerencias.items():
         checked = st.checkbox(f"{key}: '{pair['original']}' → '{pair['sugerido']}'", key=key)
         if checked:
