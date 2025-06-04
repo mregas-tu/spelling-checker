@@ -2,7 +2,7 @@
   "login_title": "Iniciar sesiónl",
   "login_document_input_text_default": "Ingresá",
   "login_next_button": "Continuara",
-  "login_document_title": "Ingresar documento",
+  "login_document_title": "Ingresar documentos\n",
   "login_document_input_label": "Documento de identidad",
   "login_document_input_label_1": "asdasd",
   "login_document_hint_error": "El documento ingresado no es válido",
