@@ -124,8 +124,11 @@ def correct_spelling_with_gemini(texts_dict):
 def upload_to_firebase(string_data):
     print("☁️ Subiendo a Firebase Remote Config vía REST...")
 
-    credentials_obj = service_account.Credentials.from_service_account_file(
-        FIREBASE_CREDENTIALS_PATH,
+    credentials_json = os.environ["FIREBASE_CREDENTIALS_JSON"]
+    credentials_dict = json.loads(credentials_json)
+
+    credentials_obj = service_account.Credentials.from_service_account_info(
+        credentials_dict,
         scopes=["https://www.googleapis.com/auth/firebase.remoteconfig"]
     )
     credentials_obj.refresh(Request())
