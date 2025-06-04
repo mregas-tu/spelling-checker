@@ -1,175 +1,275 @@
-import streamlit as st
+# -*- coding: utf-8 -*-
 import requests
-import figma_to_firebase
-from collections import defaultdict
-import pandas as pd
 import json
-import re
+import smtplib
+from email.message import EmailMessage
+from google.oauth2 import service_account
+from google.auth.transport.requests import Request
+import google.generativeai as genai
+import base64
+import os
+import time
+from dotenv import load_dotenv
 
-# --- Config ---
-GITHUB_JSON_URL = "https://raw.githubusercontent.com/mregas-tu/spelling-checker/main/strings.json"
-st.set_page_config(page_title="Figma → Firebase", page_icon="🚀", layout="wide")
-st.title("🚀 Figma → Firebase Uploader")
-st.markdown("### 📄 Cambios detectados entre Figma y GitHub")
+# === CARGAR VARIABLES DE ENTORNO ===
+load_dotenv()
 
-# --- Obtener datos de Figma ---
-diff = []
-invalid_keys = set()
-try:
-    status = st.empty()
-    status.info("Obteniendo datos...")
-    raw_entries = figma_to_firebase.get_figma_strings_raw()
-    figma_data = defaultdict(list)
-    for k, v in raw_entries:
-        figma_data[k].append(v)
-        if not re.match(r'^[a-z0-9_]+$', k):
-            diff.append({"key": k, "estado": "Key inválida", "Figma": v, "GitHub": "nombre inválido"})
-            invalid_keys.add(k)
-    status.empty()
-except Exception as e:
-    st.error(f"❌ Error al obtener los textos desde Figma:\n\n{str(e)}")
-    figma_data = {}
+# === CONFIGURACIÓN ===
+FIGMA_TOKEN = os.environ.get("FIGMA_TOKEN")
+FILE_KEY = os.environ.get("FIGMA_FILE_KEY")
+FIREBASE_CREDENTIALS_PATH = os.environ.get("FIREBASE_CREDENTIALS_PATH", "firebase_credentials.json")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
-# --- Obtener datos de GitHub ---
-try:
-    response = requests.get(GITHUB_JSON_URL)
-    response.raise_for_status()
-    github_data = response.json()
-    for k, v in github_data.items():
-        if isinstance(v, list):
-            github_data[k] = v[0]
-except Exception as e:
-    st.error(f"❌ Error al cargar el archivo desde GitHub:\n\n{str(e)}")
-    github_data = {}
+headers = {
+    "X-Figma-Token": FIGMA_TOKEN
+}
 
-# --- Comparar diferencias ---
-if figma_data and github_data:
-    for key, values in figma_data.items():
-        if key in invalid_keys:
-            continue
+# === EXTRAER TEXTOS DE FIGMA ===
+def extract_text_nodes(node, result):
+    if node.get("type") == "TEXT":
+        name = node.get("name")
+        characters = node.get("characters")
+        if name and characters:
+            if name not in result:
+                result[name] = []
+            result[name].append(characters)
+    for child in node.get("children", []):
+        extract_text_nodes(child, result)
 
-        figma_values = set(values)
-        github_val = str(github_data.get(key, '-'))
+def get_figma_strings():
+    print("🔄 Fetching Figma file...")
+    url = f"https://api.figma.com/v1/files/{FILE_KEY}?depth=100"
+    res = requests.get(url, headers=headers)
+    res.raise_for_status()
+    data = res.json()
+    result = {}
 
-        if len(figma_values) > 1:
-            for val in figma_values:
-                diff.append({"key": key, "estado": "Keys idénticas", "Figma": val, "GitHub": github_val})
-        elif key in github_data and github_data[key] != values[0]:
-            diff.append({"key": key, "estado": "Cambio", "Figma": values[0], "GitHub": str(github_data[key])})
-        elif key not in github_data:
-            diff.append({"key": key, "estado": "Nuevo", "Figma": values[0], "GitHub": "-"})
+    for page in data["document"]["children"]:
+        extract_text_nodes(page, result)
 
-    for key, value in github_data.items():
-        if key not in figma_data:
-            diff.append({"key": key, "estado": "Eliminado", "Figma": "-", "GitHub": str(value)})
+    print(f"✅ Extraídos {sum(len(v) for v in result.values())} textos desde Figma.")
+    return result
 
-    if not diff:
-        st.info("✅ No hay diferencias entre Figma y GitHub.")
-        st.stop()
+def get_figma_strings_raw():
+    print("🔄 Fetching Figma file (raw entries)...")
+    url = f"https://api.figma.com/v1/files/{FILE_KEY}?depth=100"
+    res = requests.get(url, headers=headers)
+    res.raise_for_status()
+    data = res.json()
 
-    df = pd.DataFrame(diff)
-    df = df[["key", "Figma", "GitHub", "estado"]]
-    df.sort_values(by="estado", key=lambda col: col.map({"Eliminado": 0, "Key inválida": 1, "Keys idénticas": 2, "Conflicto": 3, "Cambio": 4, "Nuevo": 5}), inplace=True)
+    result = []
 
-    has_conflicts = any(df["estado"].isin(["Conflicto", "Key inválida", "Keys idénticas"]))
-    has_deleted = any(df["estado"] == "Eliminado")
-    rows_to_display = df[df["estado"].isin(["Conflicto", "Key inválida", "Keys idénticas"])] if has_conflicts else df[df["estado"] != "Conflicto"]
+    def collect(node):
+        if node.get("type") == "TEXT":
+            name = node.get("name")
+            characters = node.get("characters")
+            if name and characters:
+                result.append((name, characters))
+        for child in node.get("children", []):
+            collect(child)
 
-    def color_estado(val):
-        return {
-            "Key inválida": "color: #FF8C00",
-            "Keys idénticas": "color: #DA70D6",
-            "Conflicto": "color: #DAA520",
-            "Cambio": "color: #4682B4",
-            "Nuevo": "color: #228B22",
-            "Eliminado": "color: #B22222"
-        }.get(val, "")
+    for page in data["document"]["children"]:
+        collect(page)
 
-    def highlight_row(val, estado):
-        if estado in ["Conflicto", "Key inválida", "Keys idénticas"]:
-            return "background-color: #FFFACD"
-        if estado == "Eliminado":
-            return "background-color: #ffe5e5"
-        return ""
+    print(f"✅ Extraídos {len(result)} textos desde Figma (sin agrupar).")
+    return result
 
-    if not rows_to_display.empty:
-        if has_conflicts:
-            st.warning("🚨 SE DETECTARON CONFLICTOS EN LOS SIGUIENTES NODOS")
-        else:
-            st.success(f"🔍 Se encontraron {len(rows_to_display)} diferencias totales:")
+# === VERIFICAR CONFLICTOS (solo warning, no detiene ejecución) ===
+def warn_if_same_key_has_multiple_values(strings_dict):
+    conflicted = {k: list(set(v)) for k, v in strings_dict.items() if len(set(v)) > 1}
 
-        styled_df = rows_to_display.style\
-            .applymap(color_estado, subset=["estado"])\
-            .apply(lambda row: [highlight_row(v, row.estado) for v in row], axis=1)\
-            .hide(axis='index')
-        st.dataframe(styled_df, hide_index=True, use_container_width=True)
-
-        if has_conflicts:
-            st.stop()
-
-# --- Revisión Ortográfica ---
-if has_conflicts:
-    st.stop()
-
-st.markdown("---")
-st.markdown("### 💜 Revisión ortográfica con Gemini")
-
-if "ortografia" not in st.session_state:
-    st.session_state.ortografia = False
-if "seleccionadas" not in st.session_state:
-    st.session_state.seleccionadas = set()
-if "sugerencias" not in st.session_state:
-    st.session_state.sugerencias = {}
-if "eliminado_confirmado" not in st.session_state:
-    st.session_state.eliminado_confirmado = False
-
-if has_deleted and not st.session_state.eliminado_confirmado:
-    st.markdown("#### ⚠️ Se detectó que un nodo fue eliminado o renombrado. ¿Estás seguro de que querés continuar?")
-    confirm = st.radio("", ["No", "Sí"], horizontal=True, index=0)
-    if confirm == "Sí":
-        st.session_state.eliminado_confirmado = True
-        st.rerun()
+    if conflicted:
+        print("\n⚠️  WARNING: SE ENCONTRARON CLAVES DUPLICADAS CON TEXTOS DIFERENTES:")
+        with open("string_conflicts.log", "w", encoding="utf-8") as log:
+            for k, values in conflicted.items():
+                print(f"🔁 {k}:")
+                for v in values:
+                    print(f'    - "{v}"')
+        print("\n")
     else:
-        st.stop()
+        print("✅ No hay conflictos de nombre con valores diferentes.")
 
-if not st.session_state.ortografia:
-    if st.button("Analizar ortografía"):
-        with st.spinner("Analizando con Gemini..."):
-            try:
-                sugerencias = figma_to_firebase.get_spelling_suggestions(figma_to_firebase.get_figma_strings())
-                if sugerencias:
-                    st.session_state.sugerencias = sugerencias
-                    st.session_state.ortografia = True
-                    st.rerun()
-                else:
-                    st.info("✅ No se encontraron sugerencias ortográficas.")
-            except Exception as e:
-                st.error(f"❌ Error al analizar ortografía: {str(e)}")
-else:
-    st.markdown("#### Sugerencias detectadas")
-    for key, pair in st.session_state.sugerencias.items():
-        checked = st.checkbox(f"{key}: '{pair['original']}' → '{pair['sugerido']}'", key=key)
-        if checked:
-            st.session_state.seleccionadas.add(key)
-        else:
-            st.session_state.seleccionadas.discard(key)
+# === CORREGIR CON GEMINI ===
+def correct_spelling_with_gemini(texts_dict):
+    print("🧠 Corrigiendo ortografía con Gemini...")
 
-    if st.button("Aplicar correcciones seleccionadas"):
-        for key in st.session_state.seleccionadas:
-            figma_data[key] = st.session_state.sugerencias[key]['sugerido']
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel("models/gemini-1.5-flash")
+
+    corrected = {}
+    for key, values in texts_dict.items():
+        value = values[0]
+        prompt = f"Dame solo el texto corregido (en español), sin explicaciones ni comillas. Si el texto está bien, devolvelo igual. Texto: {value}"
         try:
-            with open("strings.json", "w", encoding="utf-8") as f:
-                flat_figma_data = {k: (v[0] if isinstance(v, list) else v) for k, v in figma_data.items() if v}
-                json.dump(flat_figma_data, f, ensure_ascii=False, indent=2)
-            figma_to_firebase.upload_to_firebase(flat_figma_data)
-            figma_to_firebase.upload_file_to_github(
-                file_path="strings.json",
-                repo="mregas-tu/spelling-checker",
-                path_in_repo="strings.json",
-                branch="main"
-            )
-            st.success("✅ Correcciones aplicadas y subidas a GitHub y Firebase")
-        except Exception as e:
-            st.error(f"❌ No se pudo subir el JSON: {str(e)}")
+            response = model.generate_content(prompt)
+            result = response.text.strip().strip('"')
 
-st.markdown("---")
+            if result != value:
+                print(f"\n📝 Sugerencia para '{key}':")
+                print(f"    Original:  {value}")
+                print(f"    Corregido: {result}")
+                confirm = input("¿Aceptar corrección? (s/n): ").strip().lower()
+                corrected[key] = result if confirm == "s" else value
+            else:
+                corrected[key] = value
+        except Exception as e:
+            print(f"⚠️ Error al corregir '{key}': {e}")
+            corrected[key] = value
+
+    print(f"\n✅ Correcciones completadas ({len(corrected)} textos).")
+    return corrected
+
+# === SUBIR A FIREBASE ===
+def upload_to_firebase(string_data):
+    print("☁️ Subiendo a Firebase Remote Config vía REST...")
+
+    credentials_obj = service_account.Credentials.from_service_account_file(
+        FIREBASE_CREDENTIALS_PATH,
+        scopes=["https://www.googleapis.com/auth/firebase.remoteconfig"]
+    )
+    credentials_obj.refresh(Request())
+
+    access_token = credentials_obj.token
+    project_id = credentials_obj.project_id
+
+    url = f"https://firebaseremoteconfig.googleapis.com/v1/projects/{project_id}/remoteConfig"
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json; UTF-8",
+        "If-Match": "*"
+    }
+
+    payload = {
+        "parameters": {
+            "strings": {
+                "defaultValue": {
+                    "value": json.dumps(string_data, ensure_ascii=False)
+                }
+            }
+        }
+    }
+
+    response = requests.put(url, headers=headers, data=json.dumps(payload))
+
+    if response.status_code == 200:
+        print("🚀 Remote Config actualizado con éxito")
+    else:
+        print(f"❌ Error {response.status_code}: {response.text}")
+
+# === GENERAR ARCHIVOS ===
+def generate_localizable_and_constants(strings):
+    with open("Localizable.strings", "w", encoding="utf-8") as f:
+        for key, value in strings.items():
+            f.write(f'"{key}" = "{value}";\n')
+
+    with open("Strings.swift", "w", encoding="utf-8") as f:
+        f.write("enum Strings {\n")
+        for key in strings:
+            f.write(f'    static let {key} = NSLocalizedString("{key}", comment: "")\n')
+        f.write("}\n")
+
+# === SUBIR A GITHUB ===
+def upload_file_to_github(file_path, repo, path_in_repo, branch="main"):
+    if not GITHUB_TOKEN:
+        print("❌ GITHUB_TOKEN no está seteado en las variables de entorno.")
+        return
+
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    encoded_content = base64.b64encode(content).decode("utf-8")
+    api_url = f"https://api.github.com/repos/{repo}/contents/{path_in_repo}"
+
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    get_resp = requests.get(
+        api_url,
+        headers={**headers, "Cache-Control": "no-cache"},
+        params={"ref": branch}
+    )   
+    sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+
+    payload = {
+        "message": "chore: update strings.json",
+        "content": encoded_content,
+        "branch": branch,
+    }
+    if sha:
+        payload["sha"] = sha
+
+    put_resp = requests.put(api_url, headers=headers, data=json.dumps(payload))
+    if put_resp.status_code in [200, 201]:
+        print("📤 strings.json subido a GitHub correctamente.")
+    else:
+        print(f"❌ Error al subir: {put_resp.status_code} - {put_resp.text}")
+
+# === OBTENER CONTENIDO RAW DE GITHUB ===
+def download_raw_file_from_github(owner, repo, branch, path_in_repo):
+    url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path_in_repo}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+        "Cache-Control": "no-cache"
+    }
+    params = {"ref": branch}
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+    content = response.json()["content"]
+    return base64.b64decode(content).decode("utf-8")
+
+# === SUGERENCIA DE CORRECCIONES ===
+def get_spelling_suggestions(texts_dict):
+    print("🧠 Obteniendo sugerencias ortográficas con Gemini...")
+
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel("models/gemini-1.5-flash")
+
+    suggestions = {}
+    for key, values in texts_dict.items():
+        value = values[0]
+        prompt = f"Dame solo el texto corregido (en español), sin explicaciones ni comillas. Si el texto está bien, devolvelo igual. Texto: {value}"
+        try:
+            response = model.generate_content(prompt)
+            result = response.text.strip().strip('"')
+            if result != value:
+                suggestions[key] = {
+                    "original": value,
+                    "sugerido": result
+                }
+        except Exception as e:
+            print(f"⚠️ Error al procesar '{key}': {e}")
+    return suggestions
+
+# === MAIN ===
+def main():
+    raw_strings = get_figma_strings()
+    warn_if_same_key_has_multiple_values(raw_strings)
+
+    flat_strings = {k: v[0] for k, v in raw_strings.items()}
+
+    with open("strings-original.json", "w", encoding="utf-8") as f:
+        json.dump(flat_strings, f, ensure_ascii=False, indent=2)
+
+    strings_corrected = correct_spelling_with_gemini(raw_strings)
+
+    with open("strings.json", "w", encoding="utf-8") as f:
+        json.dump(strings_corrected, f, ensure_ascii=False, indent=2)
+        print("📜 strings.json (corregido) generado.")
+
+    upload_to_firebase(strings_corrected)
+    generate_localizable_and_constants(strings_corrected)
+
+    upload_file_to_github(
+        file_path="strings.json",
+        repo="mregas-tu/spelling-checker",
+        path_in_repo="strings.json",
+        branch="main"
+    )
+
+if __name__ == "__main__":
+    main()
