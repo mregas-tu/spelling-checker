@@ -96,7 +96,10 @@ if not rows_to_display.empty:
     else:
         st.success(f"🔍 Se encontraron {len(rows_to_display)} diferencias totales:")
 
-    styled_df = rows_to_display.style        .applymap(color_estado, subset=["estado"])        .apply(lambda row: [highlight_row(v, row.estado) for v in row], axis=1)        .hide(axis='index')
+    styled_df = rows_to_display.style\
+        .applymap(color_estado, subset=["estado"])\
+        .apply(lambda row: [highlight_row(v, row.estado) for v in row], axis=1)\
+        .hide(axis='index')
     st.dataframe(styled_df, hide_index=True, use_container_width=True)
 
     if has_conflicts:
