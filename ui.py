@@ -134,7 +134,7 @@ if has_deleted and not st.session_state.eliminado_confirmado:
 
 # --- Filtrar solo los textos con estado Cambio o Nuevo ---
 figma_strings_full = figma_to_firebase.get_figma_strings()
-strings_para_analizar = {row.key: figma_strings_full[row.key] for row in diff if row["estado"] in ["Cambio", "Nuevo"] and row.key in figma_strings_full}
+strings_para_analizar = {row["key"]: figma_strings_full[row["key"]] for row in diff if row["estado"] in ["Cambio", "Nuevo"] and row["key"] in figma_strings_full}
 
 if not st.session_state.ortografia:
     if st.button("Analizar ortografía"):
